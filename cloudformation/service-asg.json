@@ -1,0 +1,209 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Creates an Auto Scaling Service",
+  "Parameters": {
+    "StackName": {
+      "Description": "Name of the stack",
+      "Type": "String"
+    },
+    "EC2KeyName": {
+      "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+    },
+    "Branch": {
+      "Description": "The git branch.",
+      "Type": "String"
+    },
+    "IAMRole": {
+      "Description": "ARN of instance profile to use",
+      "Type": "String"
+    },
+    "LaunchConfigurationName": {
+      "Description": "Name of Launch Configuration",
+      "Type": "String"
+    },
+    "InstanceType": {
+      "Description": "Name of Instance Type",
+      "Type": "String"
+    },
+    "SecurityGroup": {
+      "Description": "ID of Security Group",
+      "Type": "String"
+    },
+    "AmiID": {
+      "Description": "ID of AMI",
+      "Type": "String"
+    },
+    "LoadBalancerName": {
+      "Description": "Name of load balancer",
+      "Type": "String"
+    },
+    "Subnets": {
+      "Description": "Subnets to include",
+      "Type": "CommaDelimitedList"
+    },
+    "AutoScalingGroupName": {
+      "Description": "Name of Auto Scaling Group",
+      "Type": "String"
+    },
+    "AwsAccount": {
+      "Description": "AWS Account Number",
+      "Type": "String"
+    },
+    "Environment": {
+      "Description": "Name of environment",
+      "Type": "String"
+    },
+    "EsEndpoint": {
+      "Description": "Endpoint where ES is located",
+      "Type": "String"
+    },
+    "DesiredCapacity": {
+      "Description": "Number of instances to run normally",
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "ElasticLoadBalancer" : {
+      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties": {
+        "HealthCheck" : {
+          "Target": "TCP:5045",
+          "HealthyThreshold" : "3",
+          "UnhealthyThreshold" : "5",
+          "Interval" : "30",
+          "Timeout" : "5"
+        },
+        "Listeners" : [
+          {
+            "LoadBalancerPort" : "5045",
+            "InstancePort" : "5045",
+            "Protocol" : "TCP"
+          },
+          {
+            "LoadBalancerPort" : "5515",
+            "InstancePort" : "5515",
+            "Protocol" : "TCP"
+          },
+          {
+            "LoadBalancerPort" : "8080",
+            "InstancePort" : "8080",
+            "Protocol" : "TCP"
+          },
+          {
+            "LoadBalancerPort" : "8081",
+            "InstancePort" : "8081",
+            "Protocol" : "TCP"
+          }
+        ],
+        "LoadBalancerName" : { "Ref" : "LoadBalancerName" },
+        "Scheme" : "internal",
+        "SecurityGroups" : [ { "Ref" : "SecurityGroup" } ],
+        "Subnets" : { "Ref" : "Subnets" },
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : { "Ref" : "LoadBalancerName" }
+          }
+        ]
+      }
+    },
+    "LaunchConfiguration" : {
+       "Type" : "AWS::AutoScaling::LaunchConfiguration",
+       "Properties" : {
+          "AssociatePublicIpAddress" : "false",
+          "BlockDeviceMappings" : [
+            {
+              "DeviceName" : "/dev/xvda",
+              "Ebs" : { "VolumeSize" : "8", "VolumeType" : "gp2" } 
+            },
+            {
+             "DeviceName" : "/dev/sdf",
+             "Ebs" : { "VolumeSize" : "100", "DeleteOnTermination" : "true"}
+            }
+          ],
+          "EbsOptimized" : "false",
+          "IamInstanceProfile" : { "Ref" : "IAMRole" },
+          "ImageId" : { "Ref" : "AmiID" },
+          "InstanceMonitoring" : "false",
+          "InstanceType" : { "Ref" : "InstanceType" },
+          "KeyName" : { "Ref" : "EC2KeyName" },
+          "LaunchConfigurationName" : { "Ref" : "LaunchConfigurationName" },
+          "SecurityGroups" : [ { "Ref" : "SecurityGroup" } ],
+          "UserData" : {
+            "Fn::Base64" : {
+              "Fn::Join" : [
+                "",
+                [
+                  "#!/bin/bash -x\n",
+                  "yum -y install git\n"
+                ]
+              ]
+            }
+          }
+       }
+    },
+    "AutoScalingGroup" : {
+       "Type" : "AWS::AutoScaling::AutoScalingGroup",
+       "Properties" : {
+          "AutoScalingGroupName" : { "Ref" : "AutoScalingGroupName" },
+          "Cooldown" : "300",
+          "DesiredCapacity" : { "Ref" : "DesiredCapacity" },
+          "HealthCheckGracePeriod" : 600,
+          "HealthCheckType" : "ELB",
+          "LaunchConfigurationName" : { "Ref" : "LaunchConfigurationName" },
+          "LoadBalancerNames" : [ { "Ref" : "LoadBalancerName" } ],
+          "MaxSize" : "2",
+          "MinSize" : "1",
+          "Tags" : [
+            {
+              "Key" : "Name",
+              "Value" : { "Fn::Join" : [ "", [ { "Ref" : "Environment" }, "--service-name" ] ] },
+              "PropagateAtLaunch" : "true"
+            },
+            {
+              "Key" : "aws_account",
+              "Value" : { "Ref" : "AwsAccount" },
+              "PropagateAtLaunch" : "true"
+            },
+            {
+              "Key" : "branch",
+              "Value" : { "Ref" : "Branch" },
+              "PropagateAtLaunch" : "true"
+            },
+            {
+              "Key" : "environment",
+              "Value" : { "Ref" : "Environment" },
+              "PropagateAtLaunch" : "true"
+            },
+            {
+              "Key" : "es_endpoint",
+              "Value" : { "Ref" : "EsEndpoint" },
+              "PropagateAtLaunch" : "true"
+            },
+            {
+              "Key" : "logstash_endpoint",
+              "Value" : { "Fn::GetAtt" : [ "ElasticLoadBalancer", "DNSName" ] },
+              "PropagateAtLaunch" : "true"
+            },
+            {
+              "Key" : "roles",
+              "Value" : "logstash",
+              "PropagateAtLaunch" : "true"
+            },
+            {
+              "Key" : "stack_name",
+              "Value" : { "Fn::Join" : [ "", [ { "Ref" : "Environment"} , "-service" ] ] },
+              "PropagateAtLaunch" : "true"
+            }
+          ],
+          "VPCZoneIdentifier" : { "Ref" : "Subnets" }
+       },
+       "DependsOn" : [
+         "LaunchConfiguration",
+         "ElasticLoadBalancer"
+       ]
+    }
+  }
+}
