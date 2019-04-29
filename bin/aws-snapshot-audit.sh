@@ -29,7 +29,7 @@ IFS='
 
 for snapshot in $(aws ec2 describe-snapshots --owner-ids self --output text --query 'Snapshots[*].[SnapshotId,Description]')
 do
-  snapshotid=$(echo ${snapshot} | ${sed} -n 's/.*\(snap-[a-z0-9]\+\).*/\1/p')
+  snapshotid=$(echo ${snapshot} | awk '{print $1}')
   amiid=$(echo ${snapshot} | ${sed} -n 's/.*\(ami-[a-z0-9]\+\).*/\1/p')
 
   if [ -z ${amiid} ]
