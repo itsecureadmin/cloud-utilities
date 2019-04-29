@@ -45,6 +45,7 @@ do
   else
     echo "Deleting orphaned snapshot ${snapshotid} which belongs to non-existent AMI ${amiid}"
     invalid_count=$((invalid_count+1))
+    aws ec2 delete-snapshot --snapshot-id ${snapshotid}
   fi
 
 done
