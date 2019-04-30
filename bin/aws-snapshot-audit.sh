@@ -30,7 +30,20 @@ IFS='
 for snapshot in $(aws ec2 describe-snapshots --owner-ids self --output text --query 'Snapshots[*].[SnapshotId,Description]')
 do
   snapshotid=$(echo ${snapshot} | awk '{print $1}')
-  amiid=$(echo ${snapshot} | ${sed} -n 's/.*\(ami-[a-z0-9]\+\).*/\1/p')
+  match=''
+  ami_pattern="ami-[a-z0-9]+"
+
+  for word in ${snapshot}
+  do
+    [[ ${word} =~ ${ami_pattern} ]]
+    if [[ ${BASH_REMATCH[0]} ]]
+    then
+      match="${BASH_REMATCH[0]}"
+      continue;
+    fi
+  done
+
+  amiid=${match}
 
   if [ -z ${amiid} ]
   then
