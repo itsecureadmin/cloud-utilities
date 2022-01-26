@@ -14,12 +14,6 @@ else
   sed=sed
 fi
 
-#
-# get the owner id
-# - no longer use this, but it seems too useful to remove
-#
-owner_ids=$(aws iam get-user --output text | ${sed} 's/.*iam::\(.*\):user.*/\1/g')
-
 images=$(aws ec2 describe-images --owners self --output text --query 'Images[*].[ImageId]')
 invalid_count=0
 valid_count=0
@@ -58,7 +52,7 @@ do
   else
     echo "Deleting orphaned snapshot ${snapshotid} which belongs to non-existent AMI ${amiid}"
     invalid_count=$((invalid_count+1))
-#     aws ec2 delete-snapshot --snapshot-id ${snapshotid}
+    aws ec2 delete-snapshot --snapshot-id ${snapshotid}
   fi
 
 done
